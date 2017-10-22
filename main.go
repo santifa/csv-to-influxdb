@@ -16,7 +16,7 @@ import (
 	"github.com/jpillora/opts"
 )
 
-var VERSION = "0.0.0-src"
+var VERSION = "0.0.1-src"
 
 type config struct {
 	CSVFile         string `type:"arg" help:"<csv-file> must be a path a to valid CSV file with an initial header row"`
@@ -32,9 +32,12 @@ type config struct {
 	NoAutoCreate    bool   `help:"Disable automatic creation of database"`
 	ForceFloat      bool   `help:"Force all numeric values to insert as float"`
 	ForceString     bool   `help:"Force all numeric values to insert as string"`
-	TreatNull	bool   `help:"Force treating "null" string values as such`
+  TreatNull       bool   `help:"Force treating \"null\" string values as such"`
 	Attempts        int    `help:"Maximum number of attempts to send data to influxdb before failing"`
-	HttpTimeout	int    `help:"Timeout (in seconds) for http writes used by underlying influxdb client"`
+	HttpTimeout	    int    `help:"Timeout (in seconds) for http writes used by underlying influxdb client"`
+	// new stuff
+	Delimiter       string `help:"Set the csv delimiter"`
+	Skip            int    `help:"Skip n lines at the beginning of the file"`
 }
 
 func main() {
@@ -52,7 +55,9 @@ func main() {
 		TreatNull:       false,
 		TimestampColumn: "timestamp",
 		TimestampFormat: "2006-01-02 15:04:05",
-		HttpTimeout:	 10,
+		HttpTimeout:	   10,
+	  Delimiter:       ",",
+		Skip:            0,
 	}
 
 	//parse config
@@ -70,7 +75,7 @@ func main() {
 			tagNames[name] = true
 		}
 	}
-
+	
 	//regular expressions
 	numbersRe := regexp.MustCompile(`\d`)
 	integerRe := regexp.MustCompile(`^\d+$`)
@@ -194,6 +199,13 @@ func main() {
 
 	//read csv, line by line
 	r := csv.NewReader(f)
+	// set a custom delimiter
+	r.Comma = []rune(conf.Delimiter)[0]
+	// skip lines
+	for i:= 0; i < conf.Skip; i++ {
+		r.Read()
+	}
+	
 	for i := 0; ; i++ {
 		records, err := r.Read()
 		if err != nil {
@@ -202,11 +214,12 @@ func main() {
 			}
 			log.Fatalf("CSV error: %s", err)
 		}
+
 		if i == 0 {
 			setHeaders(records)
 			continue
 		}
-
+		
 		// Create a point and add to batch
 		tags := map[string]string{}
 		fields := map[string]interface{}{}
@@ -241,7 +254,7 @@ func main() {
 				i, _ := strconv.Atoi(r)
 				fields[h] = i
 			} else if !conf.ForceString && floatRe.MatchString(r) {
-				f, _ := strconv.ParseFloat(r, 64)
+				f, _ := strconv.ParseFloat(r, 64)		
 				fields[h] = f
 			} else if trueRe.MatchString(r) {
 				fields[h] = true
