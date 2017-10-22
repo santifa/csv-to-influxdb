@@ -39,6 +39,8 @@ $ csv-to-influxdb --help
   --treat-null             Force treating "null" string values as such
   --attempts, -a           Maximum number of attempts to send data to
                            influxdb before failing
+  --skip,                  Skip n lines at the beginning of the csv file
+  --delimiter              Set a custom csv delimiter (default ",")
   --help, -h
   --version, -v
 
